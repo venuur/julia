@@ -589,23 +589,26 @@ JL_DLLEXPORT const char *jl_pathname_for_handle(void *handle)
 }
 
 #ifdef _OS_WINDOWS_
-static BOOL CALLBACK jl_EnumerateLoadedModulesProc64(
-  _In_      PCTSTR ModuleName,
-  _In_      DWORD64 ModuleBase,
-  _In_      ULONG ModuleSize,
-  _In_opt_  PVOID a
-)
-{
-    jl_array_grow_end((jl_array_t*)a, 1);
-    //XXX: change to jl_arrayset if array storage allocation for Array{String,1} changes:
-    jl_value_t *v = jl_cstr_to_string(ModuleName);
-    jl_array_ptr_set(a, jl_array_dim0(a)-1, v);
-    return TRUE;
-}
 // Takes a handle (as returned from dlopen()) and returns the absolute path to the image loaded
 JL_DLLEXPORT int jl_dllist(jl_array_t *list)
 {
-    return EnumerateLoadedModules64(GetCurrentProcess(), jl_EnumerateLoadedModulesProc64, list);
+    HMODULE hMods[1024];
+    DWORD cbNeeded;
+    unsigned int i;
+    const char* path;
+    // Get a list of all the modules in this process.
+    if (EnumProcessModules(GetCurrentProcess(), hMods, sizeof(hMods), &cbNeeded)) {
+        for (i = 0; i < (cbNeeded / sizeof(HMODULE)); i++) {
+            jl_array_grow_end((jl_array_t*)list, 1);
+            path = jl_pathname_for_handle(hMods[i]);
+            //XXX: change to jl_arrayset if array storage allocation for Array{String,1} changes:
+            jl_value_t *v = jl_cstr_to_string(path);
+            jl_array_ptr_set(list, jl_array_dim0(list)-1, v);
+        }
+        return TRUE;
+    } else {
+        return FALSE;
+    }
 }
 #endif
 
