@@ -2658,6 +2658,11 @@ JL_DLLEXPORT int64_t jl_gc_diff_total_bytes(void)
 }
 void jl_gc_sync_total_bytes(void) {last_gc_total_bytes = jl_gc_total_bytes();}
 
+JL_DLLEXPORT int64_t jl_gc_live_bytes(void)
+{
+    return live_bytes;
+}
+
 static void jl_gc_premark(jl_ptls_t ptls2)
 {
     arraylist_t *remset = ptls2->heap.remset;
