@@ -383,6 +383,20 @@ withenv("JULIA_EDITOR" => nothing, "VISUAL" => nothing, "EDITOR" => nothing) do
 end
 
 # clipboard functionality
+@static if Sys.iswindows()
+    # concurrent access error
+    hDesktop = ccall((:GetDesktopWindow, "user32"), stdcall, Ptr{Cvoid}, ())
+    @test ccall((:OpenClipboard, "user32"), stdcall, Cint, (Ptr{Cvoid},), hDesktop) != 0
+    @test_throws Base.SystemError("OpenClipboard", 0, Base.WindowsErrorInfo(0x00000005, nothing)) clipboard() # ACCESS_DENIED
+    @test ccall((:CloseClipboard, "user32"), stdcall, Cint, ()) != 0
+    # empty clipboard failure
+    @test ccall((:OpenClipboard, "user32"), stdcall, Cint, (Ptr{Cvoid},), C_NULL) != 0
+    @test ccall((:EmptyClipboard, "user32"), stdcall, Cint, ()) != 0
+    @test ccall((:CloseClipboard, "user32"), stdcall, Cint, ()) != 0
+    @test clipboard() == ""
+    # nul error (unsupported data)
+    @test_throws ArgumentError("Windows clipboard strings cannot contain NUL character") clipboard("abc\0")
+end
 if Sys.iswindows() || Sys.isapple()
     for str in ("Hello, world.", "∀ x ∃ y", "")
         clipboard(str)
