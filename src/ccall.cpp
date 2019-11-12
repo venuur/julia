@@ -692,10 +692,18 @@ static jl_cgval_t emit_cglobal(jl_codectx_t &ctx, jl_value_t **args, size_t narg
         }
         else {
             void *symaddr;
-            if (!jl_dlsym(jl_get_library(sym.f_lib), sym.f_name, &symaddr, 0)) {
+
+            void* libsym = jl_get_library_(sym.f_lib, 0);
+            if (!libsym || !jl_dlsym(libsym, sym.f_name, &symaddr, 0)) {
                 std::stringstream msg;
-                msg << "cglobal: could not find symbol ";
-                msg << sym.f_name;
+                if (!libsym) {
+                    msg << "cglobal: could not load library \n";
+                    // msg << jl_dlerror();
+                    // msg << "\n";
+                } else {
+                    msg << "cglobal: could not find symbol ";
+                    msg << sym.f_name;
+                }
                 if (sym.f_lib != NULL) {
 #ifdef _OS_WINDOWS_
                     assert(sym.f_lib != JL_EXE_LIBNAME && sym.f_lib != JL_DL_LIBNAME);
@@ -1893,10 +1901,18 @@ jl_cgval_t function_sig_t::emit_a_ccall(
         }
         else {
             void *symaddr;
-            if (!jl_dlsym(jl_get_library(symarg.f_lib), symarg.f_name, &symaddr, 0)) {
+
+            void* libsym = jl_get_library_(symarg.f_lib, 0);
+            if (!libsym || !jl_dlsym(libsym, symarg.f_name, &symaddr, 0)) {
                 std::stringstream msg;
-                msg << "ccall: could not find function ";
-                msg << symarg.f_name;
+                if (!libsym) {
+                    msg << "ccall: could not load library \n";
+                    // msg << jl_dlerror();
+                    // msg << "\n";
+                } else {
+                    msg << "ccall: could not find function ";
+                    msg << symarg.f_name;
+                }
                 if (symarg.f_lib != NULL) {
 #ifdef _OS_WINDOWS_
                     assert(symarg.f_lib != JL_EXE_LIBNAME && symarg.f_lib != JL_DL_LIBNAME);
