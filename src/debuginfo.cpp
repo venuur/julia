@@ -166,7 +166,7 @@ public:
     JuliaJITEventListener(){}
     virtual ~JuliaJITEventListener() {}
 
-    jl_method_instance_t *lookupLinfo(size_t pointer)
+    jl_method_instance_t *lookupLinfo(size_t pointer) JL_NOTSAFEPOINT
     {
         uv_rwlock_rdlock(&threadsafe);
         auto region = linfomap.lower_bound(pointer);
@@ -387,7 +387,7 @@ public:
     // virtual void NotifyFreeingObject(const ObjectImage &obj) {}
     // virtual void NotifyFreeingObject(const object::ObjectFile &Obj) {}
 
-    std::map<size_t, ObjectInfo, revcomp>& getObjectMap()
+    std::map<size_t, ObjectInfo, revcomp>& getObjectMap() JL_NOTSAFEPOINT
     {
         uv_rwlock_rdlock(&threadsafe);
         return objectmap;
@@ -403,7 +403,7 @@ JL_DLLEXPORT void ORCNotifyObjectEmitted(JITEventListener *Listener,
     ((JuliaJITEventListener*)Listener)->_NotifyObjectEmitted(obj,debugObj,L,memmgr);
 }
 
-static std::pair<char *, bool> jl_demangle(const char *name)
+static std::pair<char *, bool> jl_demangle(const char *name) JL_NOTSAFEPOINT
 {
     // This function is not allowed to reference any TLS variables since
     // it can be called from an unmanaged thread on OSX.
@@ -446,7 +446,7 @@ JITEventListener *CreateJuliaJITEventListener()
 // with for the current frame. here we'll try to expand it using debug info
 // func_name and file_name are either NULL or malloc'd pointers
 static int lookup_pointer(DIContext *context, jl_frame_t **frames,
-                          size_t pointer, int demangle, int noInline)
+                          size_t pointer, int demangle, int noInline) JL_NOTSAFEPOINT
 {
     // This function is not allowed to reference any TLS variables
     // since it can be called from an unmanaged thread on OSX.
@@ -469,7 +469,6 @@ static int lookup_pointer(DIContext *context, jl_frame_t **frames,
         }
         return 1;
     }
-    jl_mutex_lock_maybe_nogc(&codegen_lock);
     DILineInfoSpecifier infoSpec(DILineInfoSpecifier::FileLineInfoKind::AbsoluteFilePath,
                                  DILineInfoSpecifier::FunctionNameKind::ShortName);
 
@@ -478,7 +477,6 @@ static int lookup_pointer(DIContext *context, jl_frame_t **frames,
     int fromC = (*frames)[0].fromC;
     int n_frames = inlineInfo.getNumberOfFrames();
     if (n_frames == 0) {
-        jl_mutex_unlock_maybe_nogc(&codegen_lock);
         // no line number info available in the context, return without the context
         return lookup_pointer(NULL, frames, pointer, demangle, noInline);
     }
@@ -530,7 +528,6 @@ static int lookup_pointer(DIContext *context, jl_frame_t **frames,
         else
             jl_copy_str(&frame->file_name, file_name.c_str());
     }
-    jl_mutex_unlock_maybe_nogc(&codegen_lock);
     return n_frames;
 }
 
@@ -567,7 +564,7 @@ struct debug_link_info {
     StringRef filename;
     uint32_t crc32;
 };
-static debug_link_info getDebuglink(const object::ObjectFile &Obj)
+static debug_link_info getDebuglink(const object::ObjectFile &Obj) JL_NOTSAFEPOINT
 {
     debug_link_info info = {};
     for (const object::SectionRef &Section: Obj.sections()) {
@@ -697,7 +694,7 @@ void jl_register_fptrs(uint64_t sysimage_base, const jl_sysimg_fptrs_t *fptrs,
 }
 
 template<typename T>
-static inline void ignoreError(T &err)
+static inline void ignoreError(T &err) JL_NOTSAFEPOINT
 {
 #if !defined(NDEBUG)
     // Needed only with LLVM assertion build
@@ -707,7 +704,7 @@ static inline void ignoreError(T &err)
 
 static void get_function_name_and_base(const object::ObjectFile *object, bool insysimage,
                                        void **saddr, char **name, size_t pointer,
-                                       int64_t slide, bool untrusted_dladdr)
+                                       int64_t slide, bool untrusted_dladdr) JL_NOTSAFEPOINT
 {
     // Assume we only need base address for sysimg for now
     if (!insysimage || !sysimg_fptrs.base)
@@ -790,7 +787,7 @@ static void get_function_name_and_base(const object::ObjectFile *object, bool in
 #endif
 }
 
-static objfileentry_t &find_object_file(uint64_t fbase, StringRef fname)
+static objfileentry_t &find_object_file(uint64_t fbase, StringRef fname) JL_NOTSAFEPOINT
 {
     int isdarwin = 0, islinux = 0, iswindows = 0;
 #if defined(_OS_DARWIN_)
@@ -991,7 +988,7 @@ static objfileentry_t &find_object_file(uint64_t fbase, StringRef fname)
 
 extern "C" void jl_refresh_dbg_module_list(void);
 bool jl_dylib_DI_for_fptr(size_t pointer, const llvm::object::ObjectFile **obj, llvm::DIContext **context, int64_t *slide, int64_t *section_slide,
-    bool onlySysImg, bool *isSysImg, void **saddr, char **name, char **filename)
+    bool onlySysImg, bool *isSysImg, void **saddr, char **name, char **filename) JL_NOTSAFEPOINT
 {
     *obj = NULL;
     *context = NULL;
@@ -1084,7 +1081,7 @@ bool jl_dylib_DI_for_fptr(size_t pointer, const llvm::object::ObjectFile **obj, 
 }
 
 // *name and *filename should be either NULL or malloc'd pointer
-static int jl_getDylibFunctionInfo(jl_frame_t **frames, size_t pointer, int skipC, int noInline)
+static int jl_getDylibFunctionInfo(jl_frame_t **frames, size_t pointer, int skipC, int noInline) JL_NOTSAFEPOINT
 {
     // This function is not allowed to reference any TLS variables if noInline
     // since it can be called from an unmanaged thread on OSX.
@@ -1140,8 +1137,7 @@ static int jl_getDylibFunctionInfo(jl_frame_t **frames, size_t pointer, int skip
 
 int jl_DI_for_fptr(uint64_t fptr, uint64_t *symsize, int64_t *slide, int64_t *section_slide,
                       const object::ObjectFile **object,
-                      llvm::DIContext **context
-                      )
+                      llvm::DIContext **context) JL_NOTSAFEPOINT
 {
     int found = 0;
     *slide = 0;
