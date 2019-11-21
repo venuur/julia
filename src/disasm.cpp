@@ -761,7 +761,12 @@ static void jl_dump_asm_internal(
     std::unique_ptr<MCStreamer> Streamer;
     SourceMgr SrcMgr;
 
-    std::unique_ptr<MCAsmInfo> MAI(TheTarget->createMCAsmInfo(*TheTarget->createMCRegInfo(TheTriple.str()), TheTriple.str()));
+    MCTargetOptions Options;
+    std::unique_ptr<MCAsmInfo> MAI(TheTarget->createMCAsmInfo(*TheTarget->createMCRegInfo(TheTriple.str()), TheTriple.str()
+#if JL_LLVM_VERSION >= 100000
+            , Options
+#endif
+        ));
     assert(MAI && "Unable to create target asm info!");
 
     std::unique_ptr<MCRegisterInfo> MRI(TheTarget->createMCRegInfo(TheTriple.str()));
@@ -797,7 +802,6 @@ static void jl_dump_asm_internal(
     std::unique_ptr<MCAsmBackend> MAB = 0;
     if (ShowEncoding) {
         CE = std::unique_ptr<MCCodeEmitter>(TheTarget->createMCCodeEmitter(*MCII, *MRI, Ctx));
-        MCTargetOptions Options;
         MAB = std::unique_ptr<MCAsmBackend>(TheTarget->createMCAsmBackend(*STI, *MRI, Options));
     }
 #else
@@ -805,7 +809,6 @@ static void jl_dump_asm_internal(
     MCAsmBackend* MAB = 0;
     if (ShowEncoding) {
         CE = TheTarget->createMCCodeEmitter(*MCII, *MRI, Ctx);
-        MCTargetOptions Options;
         MAB = TheTarget->createMCAsmBackend(*STI, *MRI, Options);
     }
 #endif
@@ -813,8 +816,8 @@ static void jl_dump_asm_internal(
     // createAsmStreamer expects a unique_ptr to a formatted stream, which means
     // it will destruct the stream when it is done. We cannot have this, so we
     // start out with a raw stream, and create formatted stream from it here.
-    // LLVM will desctruct the formatted stream, and we keep the raw stream.
-    auto ustream = llvm::make_unique<formatted_raw_ostream>(rstream);
+    // LLVM will destroy the formatted stream, and we keep the raw stream.
+    std::unique_ptr<formatted_raw_ostream> ustream(new formatted_raw_ostream(rstream));
 #if JL_LLVM_VERSION >= 70000
     Streamer.reset(TheTarget->createAsmStreamer(Ctx, std::move(ustream), /*asmverbose*/true,
                                                 /*useDwarfDirectory*/ true,

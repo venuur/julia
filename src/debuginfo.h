@@ -13,7 +13,7 @@ extern bool jl_dylib_DI_for_fptr(size_t pointer, const object::ObjectFile **obje
 #if JL_LLVM_VERSION >= 90000
 static object::SectionedAddress makeAddress(uint64_t address)
 {
-    return object::SectionedAddress(address, object::SectionedAddress::UndefSection);
+    return object::SectionedAddress{address, object::SectionedAddress::UndefSection};
 }
 #else
 static uint64_t makeAddress(uint64_t address)
