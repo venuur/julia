@@ -492,7 +492,14 @@ julia> replace("The quick foxes run quickly.", r"fox(es)?" => s"bus\\1")
 ```
 """
 replace(s::AbstractString, pat_f::Pair; count=typemax(Int)) =
-    replace(String(s), pat_f, count=count)
+    replace(String(s), pat_f; count=count)
+
+function replace(
+    s::AbstractString, pat_f::Pair, rest_pat_f::Pair...; count=typemax(Int))
+    length(rest_pat_f) == 0 && return replace(s, pat_f; count=count)
+    s = replace(s, pat_f, count=count)
+    replace(s, first(rest_pat_f), tail(rest_pat_f)...; count=count)
+end
 
 # TODO: allow transform as the first argument to replace?
 
